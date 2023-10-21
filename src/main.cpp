@@ -158,7 +158,7 @@ void MemStress()
   //leseSektor(998);
   Sektor=998;
 
-  for(int i=0;i<1000000000;++i)
+  for(uint32 i=0;i<1000000000;++i)
   {
     Serial.printf("\r\nDurchgang Nr. %u\r\n",i);
     löscheSektor(Sektor);
