@@ -21,7 +21,7 @@ bool prüfeSektor(uint32, uint32);
 void schreibeSektor(uint32, uint32);
 
 void setup() {
-    Serial.begin(115200);
+    Serial.begin(1152000);
     wdt_disable();
 }
 
