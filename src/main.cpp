@@ -13,6 +13,12 @@
 void FlashInfo();
 void FlashCheckCRC();
 void SelfDestruct();
+void MemStress();
+void Test();
+void leseSektor(uint32);
+void löscheSektor(uint32);
+bool prüfeSektor(uint32, uint32);
+void schreibeSektor(uint32, uint32);
 
 void setup() {
     Serial.begin(115200);
@@ -26,6 +32,10 @@ void loop() {
 
   FlashInfo();
   //FlashCheckCRC();
+  MemStress();
+
+  //Test();
+
   while(true){ delay(100);wdt_reset();}
   delay(4000);
   //SelfDestruct();
@@ -131,4 +141,123 @@ void SelfDestruct()
   interrupts();
 
   delay(4000);
+}
+
+
+void MemStress()
+{
+  Serial.printf("\r\n\r\n");
+  Serial.printf("MemStress\r\n");
+
+  uint32_t letzterSektor = (FS_end / SPI_FLASH_SEC_SIZE);
+  uint32_t vorletzterSektor= letzterSektor-1;
+  uint32_t Sektor = vorletzterSektor;
+  //uint32_t Sektor = 0;
+
+  //leseSektor(Sektor);
+  //leseSektor(998);
+  Sektor=998;
+
+  for(int i=0;i<1000000000;++i)
+  {
+    Serial.printf("\r\nDurchgang Nr. %u\r\n",i);
+    löscheSektor(Sektor);
+    bool löschen = prüfeSektor(Sektor,0xffffffff);
+    if (!löschen) {delay(10000);}
+    schreibeSektor(Sektor,0);
+    bool schreiben = prüfeSektor(Sektor,0);
+    if (!schreiben) {delay(10000);}
+  }
+}
+
+bool prüfeSektor(uint32 Sektor, uint32 Wert)
+{
+  uint32_t Werte[SPI_FLASH_SEC_SIZE/4]{0}; // muss initialisert werden also mitndestens eine 0 rein schreiben
+  uint32_t Start = Sektor*SPI_FLASH_SEC_SIZE;
+  uint32_t Ende = ((Sektor+1)*SPI_FLASH_SEC_SIZE)-1;
+  Serial.printf("prüfe Sektor %u  also Adresse von %u  (0x%08x) bis %u  (0x%08x) auf den Wert 0x%08x\r\n",Sektor,Start,Start,Ende,Ende,Wert);
+  //SpiFlashOpResult Egenbnis =
+  SpiFlashOpResult Egenbnis = spi_flash_read(Sektor * SPI_FLASH_SEC_SIZE,(uint32_t *)Werte,SPI_FLASH_SEC_SIZE);
+  Serial.printf("Lesevorgang: ");
+  Serial.print(Egenbnis);
+  Serial.printf("\r\n");
+  bool OK=true;
+  for(int i=0; i<(SPI_FLASH_SEC_SIZE/4);++i)
+  {
+    //wdt_reset();
+    if(Werte[i]!=Wert)
+    {
+      OK=false;
+      Serial.printf("0x%04X ist 0x%08X  anstatt 0x%08X\r\n",i,Werte[i],Wert);
+    }
+  }
+  if(OK)
+  {
+    Serial.printf("OK\r\n");
+  }
+  return OK;
+}
+
+void schreibeSektor(uint32 Sektor, uint32 Wert)
+{
+  uint32_t Start = Sektor*SPI_FLASH_SEC_SIZE;
+  uint32_t Ende = ((Sektor+1)*SPI_FLASH_SEC_SIZE)-1;
+  Serial.printf("scheibe Sektor %u  also Adresse von %u  (0x%08x) bis %u  (0x%08x)  mit dem Wert 0x%08x\r\n",Sektor,Start,Start,Ende,Ende,Wert);
+
+  uint32_t Werte[SPI_FLASH_SEC_SIZE/4]{0};
+  for(int i=0; i<(SPI_FLASH_SEC_SIZE/4);++i)
+  {
+    Werte[i]=Wert;
+  }
+  SpiFlashOpResult Egenbnis = spi_flash_write(Sektor * SPI_FLASH_SEC_SIZE,(uint32_t *)Werte,SPI_FLASH_SEC_SIZE);
+  Serial.printf("Ergebins: ");
+  Serial.print(Egenbnis);
+  Serial.printf("\r\n");
+}
+
+void löscheSektor(uint32 Sektor)
+{
+  uint32_t Start = Sektor*SPI_FLASH_SEC_SIZE;
+  uint32_t Ende = ((Sektor+1)*SPI_FLASH_SEC_SIZE)-1;
+  Serial.printf("lösche Sektor %u  also Adresse von %u  (0x%08x) bis %u  (0x%08x)\r\n",Sektor,Start,Start,Ende,Ende);
+  SpiFlashOpResult Egenbnis = spi_flash_erase_sector(Sektor);
+  Serial.printf("Ergebins: ");
+  Serial.print(Egenbnis);
+  Serial.printf("\r\n");
+}
+
+void leseSektor(uint32 Sektor)
+{
+  //byte Bytes[SPI_FLASH_SEC_SIZE]{0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,'a','b','c','\r','\n',' '};
+  uint32_t Werte[SPI_FLASH_SEC_SIZE/4]{0}; // muss initialisert werden also mitndestens eine 0 rein schreiben
+
+  //spi_flash_read(0,(uint32_t *)Bytes,SPI_FLASH_SEC_SIZE);  // mit HexEditor geprüft OK
+  //ESP.flashRead(0,(uint32_t *)Bytes,4096);  // mit HexEditor geprüft OK
+
+  uint32_t Start = Sektor*SPI_FLASH_SEC_SIZE;
+  uint32_t Ende = ((Sektor+1)*SPI_FLASH_SEC_SIZE)-1;
+  Serial.printf("lese Sektor %u  also Adresse von %u  (0x%08x) bis %u  (0x%08x)\r\n",Sektor,Start,Start,Ende,Ende);
+  //SpiFlashOpResult Egenbnis = 
+  SpiFlashOpResult Egenbnis = spi_flash_read(Sektor * SPI_FLASH_SEC_SIZE,(uint32_t *)Werte,SPI_FLASH_SEC_SIZE);
+  Serial.printf("Ergebins: ");
+  Serial.print(Egenbnis);
+  Serial.printf("\r\n");
+  for(int i=0; i<(SPI_FLASH_SEC_SIZE/4);++i)
+  {
+    //wdt_reset();
+    Serial.printf("0x%04X = 0x%08X  \r\n",i,Werte[i]);
+  }
+}
+
+void Test()
+{
+  Serial.printf("\r\n\r\n");
+  Serial.printf("TestFunktion\r\n");
+
+  byte Bytes[32]{0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,'a','b','c','\r','\n',' '};
+  for(int i=0; i<32;++i) // tesweise auch mal bis 64
+  {
+    //wdt_reset();
+    Serial.printf("0x%02X = 0x%02X  \r\n",i,Bytes[i]);
+  }
 }
