@@ -197,7 +197,7 @@ bool prüfeSektor(uint32 Sektor, uint32 Wert,bool verbose)
     if(Werte[i]!=Wert)
     {
       OK=false;
-      Serial.printf("0x%04X ist 0x%08X  anstatt 0x%08X\r\n",i,Werte[i],Wert);
+      Serial.printf("0x%08X ist 0x%08X  anstatt 0x%08X\r\n",Start + i,Werte[i],Wert);
     }
   }
   if(OK)
