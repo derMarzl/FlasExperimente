@@ -16,20 +16,24 @@ void SelfDestruct();
 void MemStress();
 void Test();
 void leseSektor(uint32);
-void löscheSektor(uint32);
-bool prüfeSektor(uint32, uint32);
-void schreibeSektor(uint32, uint32);
+void löscheSektor(uint32, bool);
+bool prüfeSektor(uint32, uint32, bool);
+void schreibeSektor(uint32, uint32, bool);
+void LEDan();
+void LEDaus();
 
 void setup() {
-    Serial.begin(1152000);
-    wdt_disable();
+  pinMode(LED_BUILTIN, OUTPUT);
+  LEDan();
+  Serial.begin(1152000);
+  wdt_disable();
 }
 
 void loop() {
   Serial.printf("\r\n\r\nStart\r\nFlashExpreimente\r\n");
   delay(3000);
   Serial.printf("\r\n\r\nund los\r\n");
-
+  LEDaus();
   FlashInfo();
   //FlashCheckCRC();
   MemStress();
@@ -148,7 +152,7 @@ void MemStress()
 {
   Serial.printf("\r\n\r\n");
   Serial.printf("MemStress\r\n");
-
+  bool verbose=false;
   uint32_t letzterSektor = (FS_end / SPI_FLASH_SEC_SIZE);
   uint32_t vorletzterSektor= letzterSektor-1;
   uint32_t Sektor = vorletzterSektor;
@@ -160,27 +164,32 @@ void MemStress()
 
   for(uint32 i=0;i<1000000000;++i)
   {
+    LEDaus();
     Serial.printf("\r\nDurchgang Nr. %u\r\n",i);
-    löscheSektor(Sektor);
-    bool löschen = prüfeSektor(Sektor,0xffffffff);
-    if (!löschen) {delay(10000);}
-    schreibeSektor(Sektor,0);
-    bool schreiben = prüfeSektor(Sektor,0);
-    if (!schreiben) {delay(10000);}
+    löscheSektor(Sektor, verbose);
+    bool löschen = prüfeSektor(Sektor, 0xffffffff, verbose);
+    if (!löschen) {delay(10000); verbose=true;}
+    LEDan();
+    schreibeSektor(Sektor,0, verbose);
+    bool schreiben = prüfeSektor(Sektor, 0, verbose);
+    if (!schreiben) {delay(10000); verbose=true;}
   }
 }
 
-bool prüfeSektor(uint32 Sektor, uint32 Wert)
+bool prüfeSektor(uint32 Sektor, uint32 Wert,bool verbose)
 {
   uint32_t Werte[SPI_FLASH_SEC_SIZE/4]{0}; // muss initialisert werden also mitndestens eine 0 rein schreiben
   uint32_t Start = Sektor*SPI_FLASH_SEC_SIZE;
   uint32_t Ende = ((Sektor+1)*SPI_FLASH_SEC_SIZE)-1;
-  Serial.printf("prüfe Sektor %u  also Adresse von %u  (0x%08x) bis %u  (0x%08x) auf den Wert 0x%08x\r\n",Sektor,Start,Start,Ende,Ende,Wert);
+  if(verbose) {Serial.printf("prüfe Sektor %u  also Adresse von %u  (0x%08x) bis %u  (0x%08x) auf den Wert 0x%08x\r\n",Sektor,Start,Start,Ende,Ende,Wert);}
   //SpiFlashOpResult Egenbnis =
-  SpiFlashOpResult Egenbnis = spi_flash_read(Sektor * SPI_FLASH_SEC_SIZE,(uint32_t *)Werte,SPI_FLASH_SEC_SIZE);
-  Serial.printf("Lesevorgang: ");
-  Serial.print(Egenbnis);
-  Serial.printf("\r\n");
+  SpiFlashOpResult Ergebnis = spi_flash_read(Sektor * SPI_FLASH_SEC_SIZE,(uint32_t *)Werte,SPI_FLASH_SEC_SIZE);
+  if(verbose|(Ergebnis!=0))
+  {
+    Serial.printf("spi_flash_read: ");
+    Serial.print(Ergebnis);
+    Serial.printf("\r\n");
+  }
   bool OK=true;
   for(int i=0; i<(SPI_FLASH_SEC_SIZE/4);++i)
   {
@@ -198,32 +207,38 @@ bool prüfeSektor(uint32 Sektor, uint32 Wert)
   return OK;
 }
 
-void schreibeSektor(uint32 Sektor, uint32 Wert)
+void schreibeSektor(uint32 Sektor, uint32 Wert, bool verbose)
 {
   uint32_t Start = Sektor*SPI_FLASH_SEC_SIZE;
   uint32_t Ende = ((Sektor+1)*SPI_FLASH_SEC_SIZE)-1;
-  Serial.printf("scheibe Sektor %u  also Adresse von %u  (0x%08x) bis %u  (0x%08x)  mit dem Wert 0x%08x\r\n",Sektor,Start,Start,Ende,Ende,Wert);
+  if(verbose) {Serial.printf("scheibe Sektor %u  also Adresse von %u  (0x%08x) bis %u  (0x%08x)  mit dem Wert 0x%08x\r\n",Sektor,Start,Start,Ende,Ende,Wert);}
 
   uint32_t Werte[SPI_FLASH_SEC_SIZE/4]{0};
   for(int i=0; i<(SPI_FLASH_SEC_SIZE/4);++i)
   {
     Werte[i]=Wert;
   }
-  SpiFlashOpResult Egenbnis = spi_flash_write(Sektor * SPI_FLASH_SEC_SIZE,(uint32_t *)Werte,SPI_FLASH_SEC_SIZE);
-  Serial.printf("Ergebins: ");
-  Serial.print(Egenbnis);
-  Serial.printf("\r\n");
+  SpiFlashOpResult Ergebnis = spi_flash_write(Sektor * SPI_FLASH_SEC_SIZE,(uint32_t *)Werte,SPI_FLASH_SEC_SIZE);
+  if(verbose|(Ergebnis!=0))
+  {
+    Serial.printf("spi_flash_write: ");
+    Serial.print(Ergebnis);
+    Serial.printf("\r\n");
+  }
 }
 
-void löscheSektor(uint32 Sektor)
+void löscheSektor(uint32 Sektor, bool verbose)
 {
   uint32_t Start = Sektor*SPI_FLASH_SEC_SIZE;
   uint32_t Ende = ((Sektor+1)*SPI_FLASH_SEC_SIZE)-1;
-  Serial.printf("lösche Sektor %u  also Adresse von %u  (0x%08x) bis %u  (0x%08x)\r\n",Sektor,Start,Start,Ende,Ende);
-  SpiFlashOpResult Egenbnis = spi_flash_erase_sector(Sektor);
-  Serial.printf("Ergebins: ");
-  Serial.print(Egenbnis);
-  Serial.printf("\r\n");
+  if(verbose) { Serial.printf("lösche Sektor %u  also Adresse von %u  (0x%08x) bis %u  (0x%08x)\r\n",Sektor,Start,Start,Ende,Ende);}
+  SpiFlashOpResult Ergebnis = spi_flash_erase_sector(Sektor);
+  if(verbose|(Ergebnis!=0))
+  {
+    Serial.printf("spi_flash_erase_sector: ");
+    Serial.print(Ergebnis);
+    Serial.printf("\r\n");
+  }
 }
 
 void leseSektor(uint32 Sektor)
@@ -237,10 +252,10 @@ void leseSektor(uint32 Sektor)
   uint32_t Start = Sektor*SPI_FLASH_SEC_SIZE;
   uint32_t Ende = ((Sektor+1)*SPI_FLASH_SEC_SIZE)-1;
   Serial.printf("lese Sektor %u  also Adresse von %u  (0x%08x) bis %u  (0x%08x)\r\n",Sektor,Start,Start,Ende,Ende);
-  //SpiFlashOpResult Egenbnis = 
-  SpiFlashOpResult Egenbnis = spi_flash_read(Sektor * SPI_FLASH_SEC_SIZE,(uint32_t *)Werte,SPI_FLASH_SEC_SIZE);
-  Serial.printf("Ergebins: ");
-  Serial.print(Egenbnis);
+  //SpiFlashOpResult Ergebnis = 
+  SpiFlashOpResult Ergebnis = spi_flash_read(Sektor * SPI_FLASH_SEC_SIZE,(uint32_t *)Werte,SPI_FLASH_SEC_SIZE);
+  Serial.printf("spi_flash_read: ");
+  Serial.print(Ergebnis);
   Serial.printf("\r\n");
   for(int i=0; i<(SPI_FLASH_SEC_SIZE/4);++i)
   {
@@ -260,4 +275,14 @@ void Test()
     //wdt_reset();
     Serial.printf("0x%02X = 0x%02X  \r\n",i,Bytes[i]);
   }
+}
+
+void LEDan() {
+  digitalWrite(LED_BUILTIN, LOW);
+  //digitalWrite(LED_PIN, LOW);
+}
+
+void LEDaus() {
+  digitalWrite(LED_BUILTIN, HIGH);
+  //digitalWrite(LED_PIN, HIGH);
 }
