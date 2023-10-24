@@ -153,6 +153,7 @@ void MemStress()
   Serial.printf("\r\n\r\n");
   Serial.printf("MemStress\r\n");
   bool verbose=false;
+  wdt_disable();
   uint32_t letzterSektor = (FS_end / SPI_FLASH_SEC_SIZE);
   uint32_t vorletzterSektor= letzterSektor-1;
   uint32_t Sektor = vorletzterSektor;
@@ -168,11 +169,11 @@ void MemStress()
     Serial.printf("\r\nDurchgang Nr. %u\r\n",i);
     löscheSektor(Sektor, verbose);
     bool löschen = prüfeSektor(Sektor, 0xffffffff, verbose);
-    if (!löschen) {delay(10000); verbose=true;}
+    if (!löschen) {delay(3000); verbose=true;}
     LEDan();
     schreibeSektor(Sektor,0, verbose);
     bool schreiben = prüfeSektor(Sektor, 0, verbose);
-    if (!schreiben) {delay(10000); verbose=true;}
+    if (!schreiben) {delay(3000); verbose=true;}
   }
 }
 
